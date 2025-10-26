@@ -2,10 +2,6 @@ pipeline {
     agent any
 
     environment {
-
-	SSH_PORT = credentials('SSH_PORT')
-	IP_FOR_REMOTE = credentials('IP_FOR_REMOTE')
-	REMOTE_USER = credentials('REMOTE_USER')
         SCRIPT_NAME = 'run-chess-app.sh'
     }
 
@@ -13,8 +9,19 @@ pipeline {
         stage('Connecting to the server Ubuntu') {
             steps {
                 script {
-                    // Простая проверка подключения
-                    sh "ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -p ${SSH_PORT} ${REMOTE_USER}@${IP_FOR_REMOTE} 'echo \"✅ Подключение успешно\"'"
+                    withCredentials([
+                        string(credentialsId: 'SSH_PORT', variable: 'SSH_PORT'),
+                        string(credentialsId: 'IP_FOR_REMOTE', variable: 'IP_FOR_REMOTE'),
+                        string(credentialsId: 'REMOTE_USER', variable: 'REMOTE_USER')
+                    ]) {
+                        sshagent (credentials: ['ubuntu-ssh']) {
+                            sh """
+                                ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no \
+                                    -p \${SSH_PORT} \
+                                    \${REMOTE_USER}@\${IP_FOR_REMOTE}
+                            """
+                        }
+                    }
                 }
             }
         }
@@ -22,12 +29,19 @@ pipeline {
         stage('Copying the script to the server') {
             steps {
                 script {
-                    // Копирование cкрипта на сервер
-                    sh """
-                        scp -o StrictHostKeyChecking=no -P ${SSH_PORT} \
-                            ${SCRIPT_NAME} \
-                            ${REMOTE_USER}@${IP_FOR_REMOTE}:/tmp/${SCRIPT_NAME}
-                    """
+                    withCredentials([
+                        string(credentialsId: 'SSH_PORT', variable: 'SSH_PORT'),
+                        string(credentialsId: 'IP_FOR_REMOTE', variable: 'IP_FOR_REMOTE'),
+                        string(credentialsId: 'REMOTE_USER', variable: 'REMOTE_USER')
+                    ]) {
+                        sshagent (credentials: ['ubuntu-ssh']) {
+                            sh """
+                                scp -o StrictHostKeyChecking=no -P \${SSH_PORT} \
+                                    ${SCRIPT_NAME} \
+                                    \${REMOTE_USER}@\${IP_FOR_REMOTE}:/tmp/${SCRIPT_NAME}
+                            """
+                        }
+                    }
                 }
             }
         }
@@ -35,14 +49,20 @@ pipeline {
         stage('Running the script on the server') {
             steps {
                 script {
-		    // Запуск скрипта
-                    sshagent (credentials: ['ubuntu-ssh']) {
-                        sh """
-                            ssh -o StrictHostKeyChecking=no -p ${SSH_PORT} ${REMOTE_USER}@${IP_FOR_REMOTE} "
-                                chmod +x /tmp/${SCRIPT_NAME} &&
-                                /tmp/${SCRIPT_NAME}
-                            "
-                        """
+                    withCredentials([
+                        string(credentialsId: 'SSH_PORT', variable: 'SSH_PORT'),
+                        string(credentialsId: 'IP_FOR_REMOTE', variable: 'IP_FOR_REMOTE'),
+                        string(credentialsId: 'REMOTE_USER', variable: 'REMOTE_USER')
+                    ]) {
+                        sshagent (credentials: ['ubuntu-ssh']) {
+                            sh """
+                                ssh -o StrictHostKeyChecking=no -p \${SSH_PORT} \
+                                    \${REMOTE_USER}@\${IP_FOR_REMOTE} "
+                                        chmod +x /tmp/${SCRIPT_NAME} &&
+                                        /tmp/${SCRIPT_NAME}
+                                    "
+                            """
+                        }
                     }
                 }
             }
@@ -51,9 +71,18 @@ pipeline {
 
     post {
         always {
-            // Очистка временного файла на сервере
-            sshagent (credentials: ['ubuntu-ssh']) {
-                sh "ssh -o StrictHostKeyChecking=no -p ${SSH_PORT} ${REMOTE_USER}@${IP_FOR_REMOTE} 'rm -f /tmp/${SCRIPT_NAME}'"
+            withCredentials([
+                string(credentialsId: 'SSH_PORT', variable: 'SSH_PORT'),
+                string(credentialsId: 'IP_FOR_REMOTE', variable: 'IP_FOR_REMOTE'),
+                string(credentialsId: 'REMOTE_USER', variable: 'REMOTE_USER')
+            ]) {
+                sshagent (credentials: ['ubuntu-ssh']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no -p \${SSH_PORT} \
+                            \${REMOTE_USER}@\${IP_FOR_REMOTE} \
+                            'rm -f /tmp/${SCRIPT_NAME}'
+                    """
+                }
             }
         }
     }
