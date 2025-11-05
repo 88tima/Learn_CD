@@ -4,17 +4,23 @@ echo "🚀 Запуск Minikube..."
 minikube start --driver=docker
 
 HOSTNAME=$(hostname)
+IP=$(hostname -I | awk '{print $1}')
 echo "🖥️  Имя сервера: $HOSTNAME"
+echo "🌐 IP-адрес: $IP"
+echo "📦 Запуск приложения через Deployment..."
 
-echo "📦 Запуск приложения через Deployment "
-
-# Удаляем старый Deployment, если существует
+# Удаляем старый Deployment
 kubectl delete deployment chess-app --ignore-not-found
 
 # Создаём новый Deployment
 kubectl create deployment chess-app --image=88tima/chess
 
-# Убедимся, что используется свежая версия образа
-kubectl set image deployment/chess-app chess-app=88tima/chess --record
+# Ждём, пока Pod перейдёт в статус "Running"
+echo "⏳ Ожидание запуска Pod'а..."
+kubectl wait --for=condition=ready pod -l app=chess-app --timeout=120s
 
-echo "✅ Приложение запущено."
+# Получаем имя Pod'а
+POD_NAME=$(kubectl get pod -l app=chess-app -o jsonpath='{.items[0].metadata.name}')
+
+echo "📄 Вывод программы с самого начала:"
+kubectl logs -f "$POD_NAME"
